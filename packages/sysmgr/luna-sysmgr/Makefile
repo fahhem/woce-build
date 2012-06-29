@@ -43,6 +43,10 @@ package:: ipkgs/${APP_ID}_${VERSION}_armv7.ipk
 build:: build/armv7-stage/.built-${VERSION}
 unpack: build/src/.unpacked
 
+# Override source tarball with a git repo or a local folder
+LUNASYSMGR_GIT :=
+LUNASYSMGR_LOCAL :=
+
 LUNASYSMGR_NAME := LunaSysMgr
 LUNASYSMGR_TAG := initial
 LUNASYSMGR_URL := https://github.com/woce/$(LUNASYSMGR_NAME)/tarball/$(LUNASYSMGR_TAG)
@@ -52,11 +56,23 @@ LUNASYSMGR_DL := $(DL_DIR)/$(LUNASYSMGR_NAME)-$(LUNASYSMGR_TAG).tar.gz
 $(eval $(call DLTGZ,$(LUNASYSMGR_NAME),$(LUNASYSMGR_TAG),$(LUNASYSMGR_URL)))
 
 ### Unpack the software and build it
-build/src/.unpacked: sysmgr.patch $(LUNASYSMGR_DL)
+build/src/.unpacked: sysmgr.patch $(LUNASYSMGR_DL) $(LUNASYSMGR_LOCAL)
 	-rm -rf build
-	mkdir -p build/src
-	tar -C build/src --strip=1 -zxf $(LUNASYSMGR_DL)
-	patch -Np2 -d build/src < sysmgr.patch
+	mkdir -p build
+ifeq ($(LUNASYSMGR_GIT),)
+ifeq ($(LUNASYSMGR_LOCAL),)
+	  mkdir -p build/src
+	  tar -C build/src --strip=1 -zxf $(LUNASYSMGR_DL)
+	  patch -Np2 -d build/src < sysmgr.patch
+else
+	  cp -Hr $(LUNASYSMGR_LOCAL) build/src
+	  # Apply the patch if possible, but don't get hung up about it.
+	  -patch -Np2 -d build/src < sysmgr.patch
+endif
+else
+	  git clone $(LUNASYSMGR_GIT) build/src
+	  -patch -Np2 -d build/src < sysmgr.patch
+endif
 	touch $@
 
 build/armv7-stage/.built-${VERSION}: build/src/.unpacked
